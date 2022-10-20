@@ -1,0 +1,119 @@
+// Parameters (to be set programmatically eventually)
+q := 4; // order of base field, must be prime power
+n := 6; // extension degree of L over F_q
+m := 2; // extension degree of intermediate field over F_q
+r := 3; // drinfeld module rank
+prec := n div m;
+
+/* Algebraic Constructions */
+Fq := FiniteField(q);
+A<x> := PolynomialRing(Fq);
+c := Fq.1;
+L_mod := x^6 + (c + 1)*x^4 + x^3 + (c + 1)*x^2 + c*x + 1;
+L := ext<Fq | L_mod>;
+//dm := [L | Random(L): i in [0..r] ];
+dm := [L.1^5 + Fq.1*L.1^4, (Fq.1 + 1)*L.1^5 + L.1^4 + Fq.1*L.1^3 + Fq.1*L.1^2 + Fq.1*L.1 + 1, L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1, Fq.1*L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1 + 1];
+Lp<y> := PolynomialRing(L);
+ML_r := MatrixRing(L, r);
+MLp_r := MatrixRing(Lp, r);
+
+/* Performs coefficient-wise frobenius frob_iter times */
+function frob_poly(poly, frob_iter, L, coeff_ring)
+	return coeff_ring![ L | Frobenius(a, frob_iter): a in Coefficients(poly) ];
+end function;
+
+/* 
+creates matrix with 1s on the lower diagonal and with the recurrence
+coefficients on the top row with the frobenius applied frob_iter times
+*/
+function init_matr(imatr, frob_iter, dm, coeff_ring, r)
+	nmatr := ZeroMatrix(coeff_ring, r);
+	for i := 1 to r do
+		nmatr[1, i] := Frobenius(imatr[1,i], frob_iter);
+	end for;
+	for i := 1 to r - 1 do
+		nmatr[i+1, i] := 1;
+	end for;
+	nmatr[1, r] +:= (1/(Frobenius(dm[r + 1], frob_iter)))*coeff_ring.1;
+	return nmatr;
+end function;
+
+function power_eval(matr, frob_iter, L, coeff_ring)
+	ret_matr := ZeroMatrix(coeff_ring, r);
+	for i := 1 to r do
+		for j:= 1 to r do
+			ret_matr[i, j] := frob_poly(matr[i,j], frob_iter, L, coeff_ring);
+		end for;
+	end for;
+	return ret_matr;
+end function;
+
+function crys_rec(dm, base, L, Lp, n, r, prec)
+	local nstar;
+	nstar := Isqrt(n);
+	if nstar^2 lt n^2 then
+		nstar +:= 1;
+	end if;
+	s1, s0 := Quotrem(n, nstar);
+	
+	base_mat := ZeroMatrix(L, r);
+	/* Setting up the coefficient ring */
+	c1<v> := PolynomialRing(L);
+	idl := (v - dm[1])^prec;
+	coeff_ring := quo< c1 | idl >;
+
+	// Build the template matrix base_mat
+	for i := 1 to r do
+		base_mat[1,i] := (-1)*dm[r - i + 1]/dm[r + 1];
+	end for;
+	/* Setting up matrices for recurrence computation */
+	matr0 := IdentityMatrix(coeff_ring, r);
+	matr1 := IdentityMatrix(coeff_ring, r);
+	for i := s0 to 1 by -1 do
+		matr0 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+	end for;
+	for i := nstar + s0 to s0 + 1 by -1 do
+		matr1 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+	end for;
+	power_eval_matr := IdentityMatrix(L, r);
+	for i := s1 - 1 to 0 by -1 do
+		power_eval_matr *:= power_eval(matr1, i*nstar, L, coeff_ring);
+	end for;
+	return power_eval_matr*matr0;
+end function;
+	
+
+function char_poly_crys(dm, base, L, Lp, n, r, prec)
+	return CharacteristicPolynomial(crys_rec(dm, base, L, Lp, n, r, prec));
+end function;
+
+function char_poly_crys2(dm, base, L, Lp, n, r, prec, L_mod)
+        cp := CharacteristicPolynomial(crys_rec(dm, base, L, Lp, n, r, prec));
+	/* Conversion step necessary for when the precision is less than n + 1 */
+	KQ<r, t, T> := PolynomialRing(base, 3);
+	mip := Evaluate(L_mod, t);
+	ih := r - Evaluate(Polynomial(dm[1]), t);
+	py := (T - r)^prec;
+	idl := Ideal([mip, ih, py]);
+	gb := GroebnerBasis(idl);
+	//Qr := quo<KQ |Ideal(Append(gb, py)) >;
+	Qr := quo< KQ | gb >;
+	return [Qr | mono_convert(a, KQ) : a in Coefficients(cp)];
+end function;	
+
+// The equivalent of the "double replace" function
+function mono_convert(poly, KQ)
+	outer_coeffs := Coefficients(poly);
+	res := 0;
+	ctr := 0;
+	for inner in outer_coeffs do
+		res +:= Evaluate(Polynomial(inner), KQ.2)*KQ.3^ctr;
+		ctr +:= 1;
+	end for;
+	return res;
+end function;
+
+
+cpp := char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
+cpp2 := char_poly_crys2(dm, Fq, L, Lp, n, r, prec, L_mod);
+

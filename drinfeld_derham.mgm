@@ -1,0 +1,126 @@
+// Parameters (to be set programmatically eventually)
+q := 4; // order of base field, must be prime power
+n := 6; // extension degree of L over F_q
+m := n; // extension degree of intermediate field over F_q
+r := 5; // drinfeld module rank
+
+/* Algebraic Constructions */
+Fq := FiniteField(q);
+A<x> := PolynomialRing(Fq);
+c := Fq.1;
+L_mod := x^6 + (c + 1)*x^4 + x^3 + (c + 1)*x^2 + c*x + 1;
+L := ext<Fq | L_mod>;
+//dm := [L | Random(L): i in [0..r] ];
+//dm := [L.1, (Fq.1 + 1)*L.1^5 + L.1^4 + Fq.1*L.1^3 + Fq.1*L.1^2 + Fq.1*L.1 + 1, L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1, Fq.1*L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1 + 1];
+dm := [L.1^2 + L.1 + 1, L.1, L.1, 1, 1, 1];
+Lp<y> := PolynomialRing(L);
+ML_r := MatrixRing(L, r);
+MLp_r := MatrixRing(Lp, r);
+a_char := MinimalPolynomial(dm[1]);
+prime_field := ext<Fq | a_char>;
+root_set := Roots(L_mod, prime_field);
+gamma_inv := 0;
+print(root_set);
+/* Getting the root inverting map gamma */
+// Currently there is an annoying bug where magma doesn't properly reduce representatives of elements
+// of the prime field, making equality checking difficult, which means I can't currently find the correct
+// root - need to find a workaround
+for rt in root_set do
+	coeffs := Eltseq(rt[1]);
+	print("root: ");
+	print(rt[1]);
+	print(Evaluate(Polynomial(coeffs), rt[1]));
+	if Evaluate(Polynomial(coeffs), rt[1]) eq prime_field.1 then
+		gamma_inv := rt[1];
+	end if;
+end for;
+print(gamma_inv);
+
+// rngp will be the ring of coefficients; should either be L for the base case or Lp
+// for polynomials when we need to do evaluations
+function init_matr(imatr, frob_iter, dm, Lp, r, use_poly)
+	if use_poly then
+		nmatr := ZeroMatrix(Lp, r);
+		for i := 1 to r-1 do
+			nmatr[i+1,i] := 1;
+		end for;
+	else
+		nmatr := Matrix(imatr);
+	end if;
+	for i := 1 to r do
+		nmatr[1, i] := Frobenius(imatr[1,i], frob_iter);
+	end for;
+	if use_poly then
+		nmatr[1, r] +:= (1/(Frobenius(dm[r + 1], frob_iter)))*Lp.1;
+	else
+		nmatr[1, r] +:= dm[1]/Frobenius(dm[r + 1], frob_iter);
+	end if;
+	return nmatr;
+end function;
+
+function power_eval(matr, elem, frob_iter, L)
+	evalpt := Frobenius(elem, -1*frob_iter);
+	ret_matr := ZeroMatrix(L, r);
+	for i := 1 to r do
+		for j:= 1 to r do
+			ret_matr[i, j] := Frobenius(Evaluate(matr[i,j], evalpt), frob_iter);
+		end for;
+	end for;
+	return ret_matr;
+end function;
+
+function derham_rec(dm, base, L, Lp, n, r)
+	local nstar;
+	nstar := Isqrt(n);
+	if nstar^2 lt n^2 then
+		nstar +:= 1;
+	end if;
+	s1, s0 := Quotrem(n, nstar);
+	
+	base_mat := ZeroMatrix(L, r);
+	// Build the template matrix base_mat
+	for i := 1 to r do
+		base_mat[1,i] := (-1)*dm[r - i + 1]/dm[r + 1];
+	end for;
+	/* Setting up matrices for recurrence computation */
+	matr0 := IdentityMatrix(L, r);
+	matr1 := IdentityMatrix(Lp, r);
+	//print(matr0);
+	for i := s0 to 1 by -1 do
+		matr0 *:= init_matr(base_mat, i, dm, Lp, r, false);
+	end for;
+	//print("matr0");
+	//print(matr0);
+	for i := nstar + s0 to s0 + 1 by -1 do
+		matr1 *:= init_matr(base_mat, i, dm, Lp, r, true);
+	end for;
+	//print("matr1");
+	//print(matr1);
+	power_eval_matr := IdentityMatrix(L, r);
+	for i := s1 - 1 to 0 by -1 do
+		power_eval_matr *:= power_eval(matr1, dm[1], i*nstar, L);
+	end for;
+	return power_eval_matr*matr0;
+end function;
+	
+
+function char_poly_derham(dm, base, L, Lp, n, r)
+	return CharacteristicPolynomial(derham_rec(dm, base, L, Lp, n, r));
+end function;	
+
+function inv_gamma(coeff, rt)
+	coeffs := Eltseq(coeff);
+	return Evaluate(Polynomial(coeffs), rt);
+end function;
+
+function charpoly(dm, base, L, Lp, pf, n, r, rt)
+	cp := char_poly_derham(dm, base, L, Lp, n, r);
+	print(cp);
+	coeffs := Coefficients(cp);
+	ncoeffs := [ pf | inv_gamma(a, rt): a in coeffs ];
+	return Polynomial(ncoeffs);
+end function;
+
+cpp := charpoly(dm, Fq, L, Lp, prime_field, n, r, gamma_inv);
+
+
