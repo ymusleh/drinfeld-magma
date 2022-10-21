@@ -27,9 +27,9 @@ print(root_set);
 // root - need to find a workaround
 for rt in root_set do
 	coeffs := Eltseq(rt[1]);
-	print("root: ");
-	print(rt[1]);
-	print(Evaluate(Polynomial(coeffs), rt[1]));
+	//print("root: ");
+	//print(rt[1]);
+	//print(Evaluate(Polynomial(coeffs), rt[1]));
 	if Evaluate(Polynomial(coeffs), rt[1]) eq prime_field.1 then
 		gamma_inv := rt[1];
 	end if;
@@ -104,7 +104,7 @@ function derham_rec(dm, base, L, Lp, n, r)
 end function;
 	
 
-function char_poly_derham(dm, base, L, Lp, n, r)
+function charpoly_derham(dm, base, L, Lp, n, r)
 	return CharacteristicPolynomial(derham_rec(dm, base, L, Lp, n, r));
 end function;	
 
@@ -121,6 +121,6 @@ function charpoly(dm, base, L, Lp, pf, n, r, rt)
 	return Polynomial(ncoeffs);
 end function;
 
-cpp := charpoly(dm, Fq, L, Lp, prime_field, n, r, gamma_inv);
+cpp := charpoly_derham(dm, Fq, L, Lp, prime_field, n, r, gamma_inv);
 
 
