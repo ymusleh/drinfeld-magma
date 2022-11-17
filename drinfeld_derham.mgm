@@ -1,6 +1,6 @@
 // Parameters (to be set programmatically eventually)
-q := 4; // order of base field, must be prime power
-n := 6; // extension degree of L over F_q
+q := 25; // order of base field, must be prime power
+n := 12; // extension degree of L over F_q
 m := n; // extension degree of intermediate field over F_q
 r := 5; // drinfeld module rank
 

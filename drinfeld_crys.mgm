@@ -116,4 +116,5 @@ end function;
 
 cpp := char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
 cpp2 := char_poly_crys2(dm, Fq, L, Lp, n, r, prec, L_mod);
+//tt := time char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
 
