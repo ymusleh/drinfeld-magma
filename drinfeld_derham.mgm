@@ -8,7 +8,10 @@ r := 5; // drinfeld module rank
 Fq := FiniteField(q);
 A<x> := PolynomialRing(Fq);
 c := Fq.1;
-L_mod := x^6 + (c + 1)*x^4 + x^3 + (c + 1)*x^2 + c*x + 1;
+//L_mod := x^6 + (c + 1)*x^4 + x^3 + (c + 1)*x^2 + c*x + 1;
+L_mod := IrreduciblePolynomial(Fq, n);
+print("IrreduciblePolynomial: ");
+print(L_mod);
 L := ext<Fq | L_mod>;
 //dm := [L | Random(L): i in [0..r] ];
 //dm := [L.1, (Fq.1 + 1)*L.1^5 + L.1^4 + Fq.1*L.1^3 + Fq.1*L.1^2 + Fq.1*L.1 + 1, L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1, Fq.1*L.1^5 + (Fq.1 + 1)*L.1^4 + (Fq.1 + 1)*L.1 + 1];
@@ -76,7 +79,7 @@ function derham_rec(dm, base, L, Lp, n, r)
 		nstar +:= 1;
 	end if;
 	s1, s0 := Quotrem(n, nstar);
-	
+
 	base_mat := ZeroMatrix(L, r);
 	// Build the template matrix base_mat
 	for i := 1 to r do
@@ -102,18 +105,18 @@ function derham_rec(dm, base, L, Lp, n, r)
 	end for;
 	return power_eval_matr*matr0;
 end function;
-	
+
 
 function charpoly_derham(dm, base, L, Lp, n, r)
 	return CharacteristicPolynomial(derham_rec(dm, base, L, Lp, n, r));
-end function;	
+end function;
 
 function inv_gamma(coeff, rt)
 	coeffs := Eltseq(coeff);
 	return Evaluate(Polynomial(coeffs), rt);
 end function;
 
-function charpoly(dm, base, L, Lp, pf, n, r, rt)
+function charpoly(dm, base, L, Lp, n, r, pf, rt)
 	cp := char_poly_derham(dm, base, L, Lp, n, r);
 	print(cp);
 	coeffs := Coefficients(cp);
@@ -121,6 +124,5 @@ function charpoly(dm, base, L, Lp, pf, n, r, rt)
 	return Polynomial(ncoeffs);
 end function;
 
-cpp := charpoly_derham(dm, Fq, L, Lp, prime_field, n, r, gamma_inv);
-
-
+cpp1 := charpoly_derham(dm, Fq, L, Lp, n, r);
+cpp := charpoly(dm, Fq, L, Lp, n, r, prime_field, gamma_inv);
