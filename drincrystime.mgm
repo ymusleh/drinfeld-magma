@@ -1,9 +1,11 @@
 // Parameters (to be set programmatically eventually)
 q := 25; // order of base field, must be prime power
-n := 300; // extension degree of L over F_q
+n := 10; // extension degree of L over F_q
 m := 10; // extension degree of intermediate field over F_q
 r := 5; // drinfeld module rank
 prec := n div m;
+
+phi_x_list := [* *];
 
 /* Algebraic Constructions */
 Sprint("Starting code");
@@ -49,12 +51,21 @@ function frob_poly(poly, frob_iter, L, coeff_ring)
 	return coeff_ring![ L | Frobenius(a, frob_iter): a in Coefficients(poly) ];
 end function;
 
+/* Given two arrays of ring elements representing a member of a graded ring, add them coefficient-wise */
+
+function add_arr(arr1, arr2)
+	sumlen = Max(#arr1, #arr2);
+
+end function;
+
 /* 
 creates matrix with 1s on the lower diagonal and with the recurrence
 coefficients on the top row with the frobenius applied frob_iter times
 */
-function init_matr(imatr, frob_iter, dm, coeff_ring, r)
-	nmatr := ZeroMatrix(coeff_ring, r);
+function init_matr(dm, frob_iter, r, coeff_ring)
+        for i := 1 to r do
+                base_mat[1,i] := (-1)*dm[r - i + 1]/dm[r + 1];
+        end for;
 	for i := 1 to r do
 		nmatr[1, i] := Frobenius(imatr[1,i], frob_iter);
 	end for;
@@ -96,35 +107,32 @@ function crys_rec(dm, base, L, Lp, n, r, prec)
 
 	// Build the template matrix base_mat
 	Sprint("Build the template matrix");
-	for i := 1 to r do
-		base_mat[1,i] := (-1)*dm[r - i + 1]/dm[r + 1];
-	end for;
 	/* Setting up matrices for recurrence computation */
-	matr0 := IdentityMatrix(coeff_ring, r);
-	matr1 := IdentityMatrix(coeff_ring, r);
+	C0 := IdentityMatrix(coeff_ring, r);
+	C := IdentityMatrix(coeff_ring, r);
 	// 
-	Sprint("Building concrete matrix");
+	Sprint("Building base matrix");
 	for i := s0 to 1 by -1 do
-		matr0 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+		C0 *:= init_matr(dm, i, r, coeff_ring);
 	end for;
 	Sprint("Second matrix building phase");
 	for i := nstar + s0 to s0 + 1 by -1 do
-		matr1 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+		C *:= init_matr(dm, i, r, coeff_ring);
 	end for;
 	power_eval_matr := IdentityMatrix(L, r);
-	Sprint("Matrix coefficient power and mult phase");
+	Sprint("Shifted Matrix product phase");
 	for i := s1 - 1 to 0 by -1 do
-		res_matr := power_eval(matr1, i*nstar, L, coeff_ring);
+		shifted_matr := power_eval(C, i*nstar, L, coeff_ring);
 		Sprint("multing...");
 		tm := Cputime();
-		power_eval_matr *:= res_matr;
+		power_eval_matr *:= shifted_matr;
 		tmt := Cputime(tm);
 		Sprint("done multing");
 		Sprint(tmt);
-		// power_eval_matr *:= power_eval(matr1, i*nstar, L, coeff_ring);
+		// power_eval_matr *:= power_eval(C, i*nstar, L, coeff_ring);
 	end for;
 	Sprint("Final mult...");
-	return power_eval_matr*matr0;
+	return power_eval_matr*C0;
 end function;
 	
 
@@ -160,6 +168,11 @@ function char_poly_crys2(dm, base, L, Lp, n, r, prec, L_mod)
 	Qr := quo< KQ | gb >;
 	return [Qr | mono_convert(a, KQ) : a in Coefficients(cp)];
 end function;	
+
+function phi(dm, poly, L)
+	
+
+end function;
 
 //cpp := char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
 tt := Cputime();

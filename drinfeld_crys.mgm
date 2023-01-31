@@ -17,25 +17,96 @@ Lp<y> := PolynomialRing(L);
 ML_r := MatrixRing(L, r);
 MLp_r := MatrixRing(Lp, r);
 
+phi_x := [dm];
+
 /* Performs coefficient-wise frobenius frob_iter times */
 function frob_poly(poly, frob_iter, L, coeff_ring)
 	return coeff_ring![ L | Frobenius(a, frob_iter): a in Coefficients(poly) ];
 end function;
 
+/* Addition of two elements of a graded ring, represented as arrays */
+function add_arr(arr1, arr2)
+	sum_arr := [];
+	degsum := Max(#arr1, #arr2);
+	for i := 1 to degsum do
+		temp := 0;
+		if i lt #arr1 then
+			temp +:= arr1[i];
+		end if;
+		if i lt # arr2 then
+			temp +:= arr2[i];
+		end if;
+		Append(~sum_arr, temp);
+	end for;
+	return sum_arr;
+end function;
+
+/* Naive multiplication for testing */
+function skew_mult(left, right, L)
+	pdeg := #left + #right - 2;
+	prod := [L | 0 : i in [0..pdeg] ];
+	for i:= 0 to pdeg do
+		for j := 0 to i do
+			if j lt #left and (i - j) lt #right then 
+				prod[i + 1] +:= left[j + 1]*Frobenius(right[i - j + 1], j);
+			end if;
+		end for;  
+	end for;
+	return prod;
+end function;
+
+/* Zip function for creating paired array. If arrays are not the same size, it zips only up to the
+   minimum size
+ */
+function Zip(arr1, arr2)
+	min_size := Min(#arr1, #arr2);
+	zip_arr := [];
+	for i := 1 to min_size do
+		Append(~zip_arr,(arr1[i], arr2[i]));
+	end for;
+	return zip_arr;
+end function;
+
+function _phi_x(deg, dm, r, L, phi_x_list)
+	ext := #phi_x_list;
+	if deg lt ext then
+		return phi_x_list;
+	end if;
+	for i := ext + 1 to deg do
+		Append(~phi_x_list, [0 : j in [0 .. r*i] ]);
+	end for;
+	Sprint(phi_x_list);
+
+	for i:= Max(2, ext) to deg do
+		for j := 0 to r*i do
+			low_deg := Max(j - r*(i-1), 0);
+			high_deg := Min(r, j);
+			recs := [Frobenius(phi_x_list[i-1][j - k + 1], k) : k in [low_deg .. high_deg ] ];
+			sum_prod := 0;
+			for k := low_deg to high_deg do
+				sum_prod +:= phi_x_list[1][k + 1]*recs[k - low_deg + 1];
+			end for; 
+			phi_x_list[i][j + 1] :=  sum_prod;
+		end for;
+	end for;
+	return phi_x_list;	
+end function;
+
+
 /* 
 creates matrix with 1s on the lower diagonal and with the recurrence
 coefficients on the top row with the frobenius applied frob_iter times
 */
-function init_matr(imatr, frob_iter, dm, coeff_ring, r)
-	nmatr := ZeroMatrix(coeff_ring, r);
-	for i := 1 to r do
-		nmatr[1, i] := Frobenius(imatr[1,i], frob_iter);
-	end for;
-	for i := 1 to r - 1 do
-		nmatr[i+1, i] := 1;
-	end for;
-	nmatr[1, r] +:= (1/(Frobenius(dm[r + 1], frob_iter)))*coeff_ring.1;
-	return nmatr;
+function init_matr(dm, frob_iter, r, coeff_ring)
+	matr := ZeroMatrix(coeff_ring, r);
+        for i := 1 to r do
+                matr[1,i] := Frobenius((-1)*dm[r - i + 1]/dm[r + 1], frob_iter);
+        end for;
+        for i := 1 to r - 1 do
+                matr[i+1, i] := 1;
+        end for;
+        matr[1, r] +:= (1/(Frobenius(dm[r + 1], frob_iter)))*coeff_ring.1;
+        return matr;
 end function;
 
 function power_eval(matr, frob_iter, L, coeff_ring)
@@ -48,38 +119,48 @@ function power_eval(matr, frob_iter, L, coeff_ring)
 	return ret_matr;
 end function;
 
+
+function power_reduce(C, expo, modulus, L, ring)
+	m := NumberOfRows(C);
+	n := NumberOfColumns(C);
+	prmatr := ZeroMatrix(ring, m, n);
+	for i := 1 to m do
+		for j := 1 to n do
+			prmatr[i, j] := ring([L | Frobenius(c, expo) : c in Coefficients(C[i, j] mod modulus)]);
+		end for;
+	end for;
+	return prmatr;
+end function;
+
 function crys_rec(dm, base, L, Lp, n, r, prec)
 	local nstar;
-	nstar := Isqrt(n);
-	if nstar^2 lt n^2 then
+	nstar := Isqrt(n*prec);
+	if nstar^2 lt (n*prec)^2 then
 		nstar +:= 1;
 	end if;
-	s1, s0 := Quotrem(n, nstar);
+	n1, n0 := Quotrem(n, nstar);
 	
-	base_mat := ZeroMatrix(L, r);
 	/* Setting up the coefficient ring */
-	c1<v> := PolynomialRing(L);
-	idl := (v - dm[1])^prec;
-	coeff_ring := quo< c1 | idl >;
+	poly_ring<v> := PolynomialRing(L);
+	mu := (v - dm[1])^prec;
+	mu_coeffs := Coefficients(mu);
+	// coeff_ring := quo< c1 | idl >;
 
-	// Build the template matrix base_mat
-	for i := 1 to r do
-		base_mat[1,i] := (-1)*dm[r - i + 1]/dm[r + 1];
-	end for;
 	/* Setting up matrices for recurrence computation */
-	matr0 := IdentityMatrix(coeff_ring, r);
-	matr1 := IdentityMatrix(coeff_ring, r);
-	for i := s0 to 1 by -1 do
-		matr0 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+	C0 := IdentityMatrix(poly_ring, r);
+	C := IdentityMatrix(poly_ring, r);
+	for i := n0 to 1 by -1 do
+		C0 *:= init_matr(dm, i, r, poly_ring);
 	end for;
-	for i := nstar + s0 to s0 + 1 by -1 do
-		matr1 *:= init_matr(base_mat, i, dm, coeff_ring, r);
+	for i := nstar + n0 to n0 + 1 by -1 do
+		C *:= init_matr(dm, i, r, poly_ring);
 	end for;
-	power_eval_matr := IdentityMatrix(L, r);
-	for i := s1 - 1 to 0 by -1 do
-		power_eval_matr *:= power_eval(matr1, i*nstar, L, coeff_ring);
+	moduli := [poly_ring | poly_ring([ L | Frobenius(c, -i*nstar) : c in mu_coeffs  ]) : i in [1 .. n1 - 1]  ];
+	power_reduc_matr := IdentityMatrix(L, r);
+	for i := n1 - 1 to 1 by -1 do
+		power_reduc_matr *:= power_reduce(C, i*nstar, moduli[i], L, poly_ring);
 	end for;
-	return power_eval_matr*matr0;
+	return power_reduc_matr*C0;
 end function;
 	
 
@@ -115,6 +196,6 @@ end function;
 
 
 cpp := char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
-cpp2 := char_poly_crys2(dm, Fq, L, Lp, n, r, prec, L_mod);
+//cpp2 := char_poly_crys2(dm, Fq, L, Lp, n, r, prec, L_mod);
 //tt := time char_poly_crys(dm, Fq, L, Lp, n, r, n + 1);
 
