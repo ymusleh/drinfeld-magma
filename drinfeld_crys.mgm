@@ -25,7 +25,7 @@ function frob_poly(poly, frob_iter, L, coeff_ring)
 end function;
 
 /* Addition of two elements of a graded ring, represented as arrays */
-function add_arr(arr1, arr2)
+function Sadd(arr1, arr2)
 	sum_arr := [];
 	degsum := Max(#arr1, #arr2);
 	for i := 1 to degsum do
@@ -42,7 +42,7 @@ function add_arr(arr1, arr2)
 end function;
 
 /* Naive multiplication for testing */
-function skew_mult(left, right, L)
+function Smul(left, right, L)
 	pdeg := #left + #right - 2;
 	prod := [L | 0 : i in [0..pdeg] ];
 	for i:= 0 to pdeg do
@@ -67,6 +67,8 @@ function Zip(arr1, arr2)
 	return zip_arr;
 end function;
 
+
+/* Computes the array of phi_x^i up to degree deg; pass in previously computed terms to extend  */
 function _phi_x(deg, dm, r, L, phi_x_list)
 	ext := #phi_x_list;
 	if deg lt ext then
@@ -98,7 +100,7 @@ creates matrix with 1s on the lower diagonal and with the recurrence
 coefficients on the top row with the frobenius applied frob_iter times
 */
 function init_matr(dm, frob_iter, r, coeff_ring)
-	matr := ZeroMatrix(coeff_ring, r);
+	matr := ZeroMatrix(coeff_ring, r, r);
         for i := 1 to r do
                 matr[1,i] := Frobenius((-1)*dm[r - i + 1]/dm[r + 1], frob_iter);
         end for;
@@ -107,16 +109,6 @@ function init_matr(dm, frob_iter, r, coeff_ring)
         end for;
         matr[1, r] +:= (1/(Frobenius(dm[r + 1], frob_iter)))*coeff_ring.1;
         return matr;
-end function;
-
-function power_eval(matr, frob_iter, L, coeff_ring)
-	ret_matr := ZeroMatrix(coeff_ring, r);
-	for i := 1 to r do
-		for j:= 1 to r do
-			ret_matr[i, j] := frob_poly(matr[i,j], frob_iter, L, coeff_ring);
-		end for;
-	end for;
-	return ret_matr;
 end function;
 
 
