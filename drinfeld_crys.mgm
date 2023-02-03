@@ -118,7 +118,7 @@ function power_reduce(C, expo, modulus, L, ring)
 	prmatr := ZeroMatrix(ring, m, n);
 	for i := 1 to m do
 		for j := 1 to n do
-			prmatr[i, j] := ring([L | Frobenius(c, expo) : c in Coefficients(C[i, j] mod modulus)]);
+			prmatr[i, j] := Polynomial(L, [L | Frobenius(c, expo) : c in Coefficients(C[i, j] mod modulus)]);
 		end for;
 	end for;
 	return prmatr;
@@ -147,7 +147,7 @@ function crys_rec(dm, base, L, Lp, n, r, prec)
 	for i := nstar + n0 to n0 + 1 by -1 do
 		C *:= init_matr(dm, i, r, poly_ring);
 	end for;
-	moduli := [poly_ring | poly_ring([ L | Frobenius(c, -i*nstar) : c in mu_coeffs  ]) : i in [1 .. n1 - 1]  ];
+	moduli := [poly_ring | Polynomial(L, [ L | Frobenius(c, -i*nstar) : c in mu_coeffs  ]) : i in [1 .. n1 - 1]  ];
 	power_reduc_matr := IdentityMatrix(L, r);
 	for i := n1 - 1 to 1 by -1 do
 		power_reduc_matr *:= power_reduce(C, i*nstar, moduli[i], L, poly_ring);
